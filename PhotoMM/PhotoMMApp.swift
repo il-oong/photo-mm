@@ -3,7 +3,30 @@ import PhotosUI
 
 @main
 struct PhotoMMApp: App {
-    @StateObject private var store = DocumentStore()
+    @StateObject private var store: DocumentStore
+
+    init() {
+        #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("--ui-testing") {
+            let root = FileManager.default.temporaryDirectory.appendingPathComponent("PhotoMM-UITests")
+            let testStore = DocumentStore(root: root)
+            if testStore.documents.isEmpty {
+                let image = UIGraphicsImageRenderer(size: CGSize(width: 800, height: 600)).image { _ in
+                    UIColor(white: 0.85, alpha: 1).setFill()
+                    UIRectFill(CGRect(x: 0, y: 0, width: 800, height: 600))
+                    UIColor.darkGray.setStroke()
+                    let frame = UIBezierPath(rect: CGRect(x: 160, y: 100, width: 480, height: 400))
+                    frame.lineWidth = 12
+                    frame.stroke()
+                }
+                if let data = image.pngData() { _ = try? testStore.importPhoto(data) }
+            }
+            _store = StateObject(wrappedValue: testStore)
+            return
+        }
+        #endif
+        _store = StateObject(wrappedValue: DocumentStore())
+    }
     var body: some Scene {
         WindowGroup { LibraryView().environmentObject(store) }
     }

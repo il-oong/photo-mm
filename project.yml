@@ -32,11 +32,21 @@ targets:
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
+  PhotoMMUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [PhotoMMUITests]
+    dependencies:
+      - target: PhotoMM
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
 schemes:
   PhotoMM:
     build:
       targets:
         PhotoMM: all
         PhotoMMTests: [test]
+        PhotoMMUITests: [test]
     test:
-      targets: [PhotoMMTests]
+      targets: [PhotoMMTests, PhotoMMUITests]
