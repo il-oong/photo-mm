@@ -1,0 +1,41 @@
+name: PhotoMM
+options:
+  bundleIdPrefix: com.photomm
+  deploymentTarget:
+    iOS: '17.0'
+settings:
+  base:
+    SWIFT_VERSION: '5.0'
+    TARGETED_DEVICE_FAMILY: '1,2'
+    MARKETING_VERSION: '0.1.0'
+    CURRENT_PROJECT_VERSION: '1'
+targets:
+  PhotoMM:
+    type: application
+    platform: iOS
+    sources: [PhotoMM]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.photomm.app
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Photo MM
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+  PhotoMMTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [PhotoMMTests]
+    dependencies:
+      - target: PhotoMM
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  PhotoMM:
+    build:
+      targets:
+        PhotoMM: all
+        PhotoMMTests: [test]
+    test:
+      targets: [PhotoMMTests]
