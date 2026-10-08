@@ -207,8 +207,9 @@ final class DrawingView: UIView, UIGestureRecognizerDelegate {
         return nil
     }
 
-    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
-        canMove && handle(at: gestureRecognizer.location(in: self)) != nil
+    override func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        guard gestureRecognizer is UIPanGestureRecognizer else { return true }
+        return canMove && handle(at: gestureRecognizer.location(in: self)) != nil
     }
 
     @objc private func tap(_ gesture: UITapGestureRecognizer) {

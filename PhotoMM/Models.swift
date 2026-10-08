@@ -41,7 +41,13 @@ struct Annotation: Codable, Equatable, Identifiable {
     var fontSize: Double = 18
 
     var label: String {
-        kind == .dimension ? "\(text) mm" : text
+        guard kind == .dimension else { return text }
+        let formatter = NumberFormatter()
+        formatter.locale = Locale(identifier: "en_US")
+        formatter.numberStyle = .decimal
+        formatter.maximumFractionDigits = 2
+        let number = NSDecimalNumber(string: text, locale: Locale(identifier: "en_US_POSIX"))
+        return "\(formatter.string(from: number) ?? text) mm"
     }
 
     static func validMillimeters(_ input: String) -> String? {
