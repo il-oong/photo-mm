@@ -174,3 +174,7 @@ $('exportBtn').onclick = async () => {
   if (s.style) { style.color = s.style.color; $('color').value = s.style.color; $('size').value = s.style.slider; }
   await setImage(s.blob, true).catch(() => {});
 })();
+
+if ('serviceWorker' in navigator) {
+  addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+}
