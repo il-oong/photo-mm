@@ -12,16 +12,23 @@ const TOKEN = process.env.API_TOKEN; // 설정하면 Authorization: Bearer <toke
 let active = 0;
 const MAX_CONCURRENT = 2;
 
-const server = http.createServer(async (req, res) => {
+const server = http.createServer((req, res) => {
+  handle(req, res).catch(() => {
+    if (!res.headersSent) res.writeHead(400);
+    res.end();
+  });
+});
+
+async function handle(req, res) {
   const u = new URL(req.url, 'http://localhost');
   if (u.pathname === '/health') {
     res.writeHead(200).end('ok');
     return;
   }
   if (u.pathname !== '/capture' && req.method === 'GET') {
-    const rel = u.pathname === '/' ? 'index.html' : path.normalize(decodeURIComponent(u.pathname)).replace(/^[/\\]+/, '');
-    if (rel.startsWith('..')) { res.writeHead(404).end('not found'); return; }
     try {
+      const rel = u.pathname === '/' ? 'index.html' : path.normalize(decodeURIComponent(u.pathname)).replace(/^[/\\]+/, '');
+      if (rel.startsWith('..')) throw new Error('bad path');
       const data = await readFile(path.join(PUBLIC, rel));
       res.writeHead(200, { 'Content-Type': TYPES[path.extname(rel)] || 'application/octet-stream' }).end(data);
     } catch {
@@ -64,6 +71,6 @@ const server = http.createServer(async (req, res) => {
   } finally {
     active--;
   }
-});
+}
 
 server.listen(PORT, () => console.log(`capture server on :${PORT}`));

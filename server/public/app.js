@@ -112,9 +112,12 @@ function setMode(m) {
 }
 document.querySelectorAll('[data-mode]').forEach((b) => (b.onclick = () => setMode(b.dataset.mode)));
 
-$('color').oninput = (e) => { style.color = e.target.value; if (selected) { selected.color = style.color; commit(); } };
-$('size').oninput = () => { if (selected) { selected.size = sizeFromSlider(); redraw(); } };
-$('size').onchange = () => persist();
+// 색상·크기 조절은 한 번 만지는 동안 하나의 실행취소 단위로 묶는다
+let styleSnapped = false;
+const snapOnce = () => { if (!styleSnapped) { snapshot(); styleSnapped = true; } };
+$('color').oninput = (e) => { style.color = e.target.value; if (selected) { snapOnce(); selected.color = style.color; commit(); } };
+$('size').oninput = () => { if (selected) { snapOnce(); selected.size = sizeFromSlider(); redraw(); } };
+$('color').onchange = $('size').onchange = () => { styleSnapped = false; persist(); };
 $('undo').onclick = () => { if (!undoStack.length) return; items = JSON.parse(undoStack.pop()); selected = null; commit(); };
 $('del').onclick = () => { if (!selected) return; snapshot(); items = items.filter((i) => i !== selected); selected = null; commit(); };
 $('edit').onclick = async () => {
