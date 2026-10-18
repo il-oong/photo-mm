@@ -18,7 +18,9 @@ async function launchOptions() {
     args: ['--no-sandbox', '--disable-dev-shm-usage'],
   };
 }
-function getBrowser() {
+const perRequestBrowser = !!(process.env.VERCEL || process.env.CAPTURE_PER_REQUEST_BROWSER); // 단일 프로세스 chromium 은 컨텍스트를 닫으면 같이 종료되므로 재사용 불가
+async function getBrowser() {
+  if (perRequestBrowser) return chromium.launch(await launchOptions());
   browserPromise ??= launchOptions()
     .then((o) => chromium.launch(o))
     .then((browser) => {
@@ -123,6 +125,7 @@ export async function capturePage(rawUrl, { width = DEFAULT_WIDTH, mobile = true
     assertNotBlocked();
     return { image, height, truncated };
   } finally {
-    await context.close();
+    await context.close().catch(() => {});
+    if (perRequestBrowser) await browser.close().catch(() => {});
   }
 }
