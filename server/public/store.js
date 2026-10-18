@@ -8,8 +8,16 @@ const open = () => new Promise((res, rej) => {
   r.onerror = () => rej(r.error);
 });
 
+// 저장 요청이 겹쳐도 호출 순서대로 하나씩 처리해, 오래된 저장이 나중에 덮어쓰지 않게 한다
+let queue = Promise.resolve();
 /** 성공하면 true */
-export async function save(blob, items, style) {
+export function save(blob, items, style) {
+  const run = queue.then(() => write(blob, items, style));
+  queue = run.catch(() => {});
+  return run;
+}
+
+async function write(blob, items, style) {
   try {
     const buf = await blob.arrayBuffer();
     const db = await open();

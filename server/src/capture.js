@@ -6,6 +6,24 @@ const MAX_HEIGHT = 10000; // CSS px. x SCALE = 15000px 로 chromium 이미지 �
 const DEFAULT_WIDTH = 390; // iPhone 기준 폭
 const MAX_BYTES = 4_000_000; // Vercel 함수 응답 한도(4.5MB) 안쪽
 
+/**
+ * 점점 작아지는 설정으로 촬영해 MAX_BYTES 안에 들어오는 첫 결과를 돌려준다.
+ * 끝까지 넘으면 오류. shot(opts) -> Promise<Buffer>
+ */
+export async function screenshotUnderCap(shot, maxBytes = MAX_BYTES) {
+  const attempts = [
+    { quality: 82 },
+    { quality: 55 },
+    { quality: 50, scale: 'css' }, // 1.5x -> 1x
+    { quality: 35, scale: 'css' },
+  ];
+  for (const opts of attempts) {
+    const image = await shot(opts);
+    if (image.length <= maxBytes) return image;
+  }
+  throw new Error('페이지 이미지가 너무 커서 캡처할 수 없습니다');
+}
+
 let browserPromise;
 async function launchOptions() {
   if (process.env.VERCEL) {
@@ -118,10 +136,9 @@ export async function capturePage(rawUrl, { width = DEFAULT_WIDTH, mobile = true
     );
     const truncated = full > MAX_HEIGHT;
     const height = Math.min(full, MAX_HEIGHT);
-    const shot = (quality) =>
-      page.screenshot({ type: 'jpeg', quality, fullPage: true, clip: { x: 0, y: 0, width: w, height } });
-    let image = await shot(82);
-    if (image.length > MAX_BYTES) image = await shot(55);
+    const image = await screenshotUnderCap((o) =>
+      page.screenshot({ type: 'jpeg', fullPage: true, clip: { x: 0, y: 0, width: w, height }, ...o }),
+    );
     assertNotBlocked();
     return { image, height, truncated };
   } finally {
