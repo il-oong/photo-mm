@@ -1,6 +1,11 @@
 import http from 'node:http';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { capturePage } from './capture.js';
 
+const PUBLIC = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.webmanifest': 'application/manifest+json', '.png': 'image/png' };
 const PORT = process.env.PORT || 3000;
 const TOKEN = process.env.API_TOKEN; // 설정하면 Authorization: Bearer <token> 필요
 
@@ -11,6 +16,17 @@ const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://localhost');
   if (u.pathname === '/health') {
     res.writeHead(200).end('ok');
+    return;
+  }
+  if (u.pathname !== '/capture' && req.method === 'GET') {
+    const rel = u.pathname === '/' ? 'index.html' : path.normalize(decodeURIComponent(u.pathname)).replace(/^[/\\]+/, '');
+    if (rel.startsWith('..')) { res.writeHead(404).end('not found'); return; }
+    try {
+      const data = await readFile(path.join(PUBLIC, rel));
+      res.writeHead(200, { 'Content-Type': TYPES[path.extname(rel)] || 'application/octet-stream' }).end(data);
+    } catch {
+      res.writeHead(404).end('not found');
+    }
     return;
   }
   if (u.pathname !== '/capture' || req.method !== 'GET') {
