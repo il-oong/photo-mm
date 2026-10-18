@@ -29,3 +29,12 @@
 - 현장별 사진 분류 및 PDF 내보내기
 
 스크린샷 촬영 직후 앱을 자동 실행하는 방식은 iOS 제약이 있어 첫 버전의 전제로 삼지 않습니다.
+## 웹페이지 전체 캡처 (추가)
+
+링크로 받은 페이지를 앱에서 열 수 없을 때, 서버가 해당 사이트를 처음부터 끝까지 **이미지 한 장**으로 캡처해 돌려줍니다. 받은 이미지를 그대로 사진처럼 열어 치수/메모를 기록합니다.
+
+- `server/` — Node + Playwright(Chromium) 캡처 서버, Railway(Dockerfile)로 배포
+- `GET /capture?url=<주소>[&width=390][&desktop=1]` → `image/png`
+- 기본은 iPhone 폭(390px, 2x), 지연 로딩 이미지를 위해 끝까지 스크롤 후 촬영
+- 높이 상한 16,000px (초과 시 `X-Truncated: true`)
+- 내부망/사설 IP 차단(SSRF 방지), 동시 2건 제한, `API_TOKEN` 설정 시 Bearer 인증
