@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#1c1c1e"/>
+  <rect x="96" y="120" width="320" height="220" rx="24" fill="#8ab4c8"/>
+  <rect x="140" y="160" width="232" height="140" rx="10" fill="#fff"/>
+  <g stroke="#ff3b30" stroke-width="14" stroke-linecap="round">
+    <line x1="120" y1="392" x2="392" y2="392"/>
+    <line x1="120" y1="364" x2="120" y2="420"/>
+    <line x1="392" y1="364" x2="392" y2="420"/>
+  </g>
+  <rect x="196" y="366" width="120" height="52" rx="14" fill="#fff" stroke="#ff3b30" stroke-width="6"/>
+  <text x="256" y="404" font-family="system-ui,-apple-system,sans-serif" font-size="34" font-weight="700" fill="#ff3b30" text-anchor="middle">mm</text>
+</svg>

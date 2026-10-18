@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { capturePage } from './capture.js';
 
 const PUBLIC = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.webmanifest': 'application/manifest+json', '.png': 'image/png' };
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.svg': 'image/svg+xml' };
 const PORT = process.env.PORT || 3000;
 const TOKEN = process.env.API_TOKEN; // 설정하면 Authorization: Bearer <token> 필요
 
