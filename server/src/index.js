@@ -55,17 +55,17 @@ async function handle(req, res) {
   }
   active++;
   try {
-    const { png, height, truncated } = await capturePage(target, {
+    const { image, height, truncated } = await capturePage(target, {
       width: Number(u.searchParams.get('width')) || undefined,
       mobile: u.searchParams.get('desktop') !== '1',
     });
     res.writeHead(200, {
-      'Content-Type': 'image/png',
-      'Content-Length': png.length,
+      'Content-Type': 'image/jpeg',
+      'Content-Length': image.length,
       'X-Page-Height': String(height),
       'X-Truncated': String(truncated),
     });
-    res.end(png);
+    res.end(image);
   } catch (e) {
     res.writeHead(422, { 'Content-Type': 'text/plain; charset=utf-8' }).end(String(e.message));
   } finally {

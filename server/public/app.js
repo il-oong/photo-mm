@@ -40,7 +40,15 @@ function redraw() {
 }
 
 function snapshot() { undoStack.push(JSON.stringify(items)); if (undoStack.length > 50) undoStack.shift(); }
-function persist() { if (blob) store.save(blob, items, { color: style.color, slider: $('size').value }); }
+let saveWarned = false;
+async function persist() {
+  if (!blob) return;
+  const ok = await store.save(blob, items, { color: style.color, slider: $('size').value });
+  if (!ok && !saveWarned) { saveWarned = true; toast('자동 저장이 안 됩니다. 홈 화면에 추가한 앱이나 사파리에서 여세요'); }
+}
+// 앱이 백그라운드로 가거나 닫히기 직전에 한 번 더 저장
+addEventListener('pagehide', persist);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') persist(); });
 function commit() { redraw(); persist(); }
 
 function pos(e) {
@@ -150,21 +158,34 @@ $('urlBtn').onclick = async () => {
       localStorage.setItem('captureToken', token);
       r = await fetch(`/capture?url=${encodeURIComponent(u)}`, { headers: { Authorization: `Bearer ${token}` } });
     }
-    if (!r.ok) throw new Error(await r.text());
+    if (!r.ok) throw new Error(r.status === 404 ? '서버에 캡처 기능이 없습니다' : (await r.text()).slice(0, 120));
     const b = await r.blob();
     await setImage(b);
-    toast(r.headers.get('X-Truncated') === 'true' ? '페이지가 길어 일부만 캡처됨 (16,000px)' : '캡처 완료');
+    toast(r.headers.get('X-Truncated') === 'true' ? '페이지가 너무 길어 위쪽 일부만 캡처됨' : '캡처 완료');
   } catch (e) { toast('캡처 실패: ' + e.message); }
 };
 
+// 저장·공유: 페이지를 이동하지 않는다. 이미지를 먼저 만들어 미리보기로 보여 주고,
+// 두 번째 탭(사용자 제스처)에서 공유 시트를 연다. (iOS 는 오래 걸린 뒤의 share() 를 거부함)
+let exported = null;
 $('exportBtn').onclick = async () => {
-  const out = await exportPng(img, items);
-  const file = new File([out], 'photo-mm.png', { type: 'image/png' });
-  if (navigator.canShare?.({ files: [file] })) {
-    try { await navigator.share({ files: [file] }); return; } catch (e) { if (e.name === 'AbortError') return; }
+  toast('이미지 만드는 중…');
+  try {
+    const out = await exportPng(img, items);
+    exported = new File([out], 'photo-mm.png', { type: 'image/png' });
+    const img2 = $('exportImg');
+    if (img2.src) URL.revokeObjectURL(img2.src);
+    img2.src = URL.createObjectURL(out);
+    $('toast').style.display = 'none';
+    $('dlgExport').showModal();
+  } catch { toast('이미지를 만들 수 없습니다'); }
+};
+$('shareBtn').onclick = async () => {
+  if (!exported) return;
+  if (navigator.canShare?.({ files: [exported] })) {
+    try { await navigator.share({ files: [exported] }); return; } catch (e) { if (e.name === 'AbortError') return; }
   }
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(out); a.download = 'photo-mm.png'; a.click();
+  toast('공유를 지원하지 않습니다. 이미지를 길게 눌러 저장하세요');
 };
 
 (async () => {

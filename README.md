@@ -34,9 +34,10 @@
 링크로 받은 페이지를 앱에서 열 수 없을 때, 서버가 해당 사이트를 처음부터 끝까지 **이미지 한 장**으로 캡처해 돌려줍니다. 받은 이미지를 그대로 사진처럼 열어 치수/메모를 기록합니다.
 
 - `server/` — Node + Playwright(Chromium) 캡처 서버, Railway(Dockerfile)로 배포
-- `GET /capture?url=<주소>[&width=390][&desktop=1]` → `image/png`
-- 기본은 iPhone 폭(390px, 2x), 지연 로딩 이미지를 위해 끝까지 스크롤 후 촬영
-- 높이 상한 16,000px (초과 시 `X-Truncated: true`)
+- `GET /capture?url=<주소>[&width=390][&desktop=1]` → `image/jpeg`
+- 기본은 iPhone 폭(390px, 1.5x), 지연 로딩 이미지를 위해 끝까지 스크롤 후 촬영
+- 높이 상한 10,000px (초과 시 `X-Truncated: true`), 응답 4MB 이하로 압축 (Vercel 한도)
+- Vercel 에서는 `api/capture.js` 서버리스 함수(`@sparticuz/chromium`)로 같은 기능을 제공하고 `/capture` 로 연결됨
 - 내부망/사설 IP 차단(SSRF 방지), 동시 2건 제한, `API_TOKEN` 설정 시 Bearer 인증
 
 ## 앱 (웹앱/PWA)

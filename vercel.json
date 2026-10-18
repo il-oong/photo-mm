@@ -1,0 +1,9 @@
+{
+  "rewrites": [{ "source": "/capture", "destination": "/api/capture" }],
+  "functions": {
+    "api/capture.js": {
+      "maxDuration": 60,
+      "includeFiles": "node_modules/@sparticuz/chromium/bin/**"
+    }
+  }
+}

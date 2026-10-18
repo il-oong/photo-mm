@@ -74,6 +74,12 @@
   <input id="urlIn" type="url" placeholder="https://" autocomplete="off">
   <div class="row"><button value="cancel">취소</button><button value="ok" class="on">캡처</button></div>
 </form></dialog>
+<dialog id="dlgExport"><form method="dialog">
+  <div>완성된 이미지</div>
+  <img id="exportImg" alt="완성된 이미지" style="width:100%;max-height:50vh;object-fit:contain;margin:10px 0;border-radius:8px;background:#000">
+  <div style="font-size:13px;color:#8e8e93;margin-bottom:10px">공유 버튼으로 사진 앱에 저장하거나, 이미지를 길게 눌러 "사진에 추가"를 선택하세요. 편집 중인 작업은 그대로 유지됩니다.</div>
+  <div class="row"><button value="close">닫기</button><button type="button" id="shareBtn" class="on">공유·저장</button></div>
+</form></dialog>
 <script type="module" src="/app.js"></script>
 </body>
 </html>

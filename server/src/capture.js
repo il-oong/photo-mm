@@ -1,15 +1,50 @@
 import { chromium } from 'playwright-core';
-import { assertPublicUrl, isPrivateAddress } from './urlGuard.js';
+import { allowPrivate, assertPublicUrl, isPrivateAddress } from './urlGuard.js';
 
-const MAX_HEIGHT = 16000; // chromium 텍스처 한계 안쪽으로 제한
+const SCALE = 1.5;
+const MAX_HEIGHT = 10000; // CSS px. x SCALE = 15000px 로 chromium 이미지 한계(16384) 안쪽
 const DEFAULT_WIDTH = 390; // iPhone 기준 폭
+const MAX_BYTES = 4_000_000; // Vercel 함수 응답 한도(4.5MB) 안쪽
+
+/**
+ * 점점 작아지는 설정으로 촬영해 MAX_BYTES 안에 들어오는 첫 결과를 돌려준다.
+ * 끝까지 넘으면 오류. shot(opts) -> Promise<Buffer>
+ */
+export async function screenshotUnderCap(shot, maxBytes = MAX_BYTES) {
+  const attempts = [
+    { quality: 82 },
+    { quality: 55 },
+    { quality: 50, scale: 'css' }, // 1.5x -> 1x
+    { quality: 35, scale: 'css' },
+  ];
+  for (const opts of attempts) {
+    const image = await shot(opts);
+    if (image.length <= maxBytes) return image;
+  }
+  throw new Error('페이지 이미지가 너무 커서 캡처할 수 없습니다');
+}
 
 let browserPromise;
-function getBrowser() {
-  browserPromise ??= chromium
-    .launch({
-      executablePath: process.env.CHROMIUM_PATH || undefined,
-      args: ['--no-sandbox', '--disable-dev-shm-usage'],
+async function launchOptions() {
+  if (process.env.VERCEL) {
+    // Vercel 서버리스: 번들된 경량 Chromium 사용
+    const { default: sparticuz } = await import('@sparticuz/chromium');
+    return { executablePath: await sparticuz.executablePath(), args: sparticuz.args, headless: true };
+  }
+  return {
+    executablePath: process.env.CHROMIUM_PATH || undefined,
+    args: ['--no-sandbox', '--disable-dev-shm-usage'],
+  };
+}
+const perRequestBrowser = !!(process.env.VERCEL || process.env.CAPTURE_PER_REQUEST_BROWSER); // 단일 프로세스 chromium 은 컨텍스트를 닫으면 같이 종료되므로 재사용 불가
+async function getBrowser() {
+  if (perRequestBrowser) return chromium.launch(await launchOptions());
+  browserPromise ??= launchOptions()
+    .then((o) => chromium.launch(o))
+    .then((browser) => {
+      // Chromium 이 죽으면 다음 요청에서 새로 띄운다
+      browser.on('disconnected', () => { browserPromise = undefined; });
+      return browser;
     })
     .catch((e) => {
       browserPromise = undefined;
@@ -55,8 +90,8 @@ async function settleAfterScroll(page) {
 }
 
 /**
- * 페이지 전체를 하나의 PNG로 캡처한다.
- * @returns {Promise<{png: Buffer, height: number, truncated: boolean}>}
+ * 페이지 전체를 하나의 JPEG 이미지로 캡처한다.
+ * @returns {Promise<{image: Buffer, height: number, truncated: boolean}>}
  */
 export async function capturePage(rawUrl, { width = DEFAULT_WIDTH, mobile = true } = {}) {
   const url = await assertPublicUrl(rawUrl);
@@ -64,7 +99,7 @@ export async function capturePage(rawUrl, { width = DEFAULT_WIDTH, mobile = true
   const browser = await getBrowser();
   const context = await browser.newContext({
     viewport: { width: w, height: 844 },
-    deviceScaleFactor: 2,
+    deviceScaleFactor: SCALE,
     isMobile: mobile,
     hasTouch: mobile,
     userAgent: mobile
@@ -86,7 +121,7 @@ export async function capturePage(rawUrl, { width = DEFAULT_WIDTH, mobile = true
     let blocked = false;
     page.on('response', async (res) => {
       const addr = await res.serverAddr().catch(() => null);
-      if (addr && isPrivateAddress(addr.ipAddress)) blocked = true;
+      if (!allowPrivate() && addr && isPrivateAddress(addr.ipAddress)) blocked = true;
     });
     const assertNotBlocked = () => {
       if (blocked) throw new Error('내부 네트워크 주소는 캡처할 수 없습니다');
@@ -101,14 +136,13 @@ export async function capturePage(rawUrl, { width = DEFAULT_WIDTH, mobile = true
     );
     const truncated = full > MAX_HEIGHT;
     const height = Math.min(full, MAX_HEIGHT);
-    const png = await page.screenshot({
-      type: 'png',
-      fullPage: true,
-      clip: { x: 0, y: 0, width: w, height },
-    });
+    const image = await screenshotUnderCap((o) =>
+      page.screenshot({ type: 'jpeg', fullPage: true, clip: { x: 0, y: 0, width: w, height }, ...o }),
+    );
     assertNotBlocked();
-    return { png, height, truncated };
+    return { image, height, truncated };
   } finally {
-    await context.close();
+    await context.close().catch(() => {});
+    if (perRequestBrowser) await browser.close().catch(() => {});
   }
 }
