@@ -1,5 +1,5 @@
 // 앱 셸을 캐시해 오프라인에서도 열리게 한다. /capture 는 항상 네트워크.
-const CACHE = 'photo-mm-v1';
+const CACHE = 'photo-mm-v2';
 const SHELL = ['/', '/index.html', '/app.js', '/lib.js', '/render.js', '/store.js', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/apple-touch-icon.png'];
 
 self.addEventListener('install', (e) => {

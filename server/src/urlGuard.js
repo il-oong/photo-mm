@@ -26,6 +26,9 @@ export function isPrivateAddress(ip) {
   return true;
 }
 
+// 로컬 테스트 전용: 내부망 주소 검사를 끈다 (운영에서는 설정하지 않는다)
+export const allowPrivate = () => process.env.CAPTURE_ALLOW_PRIVATE === '1';
+
 /** Throws if the URL is not a public http(s) URL. Returns the normalized URL string. */
 export async function assertPublicUrl(raw) {
   let u;
@@ -37,6 +40,7 @@ export async function assertPublicUrl(raw) {
   if (u.protocol !== 'http:' && u.protocol !== 'https:') {
     throw new Error('http/https 주소만 가능합니다');
   }
+  if (allowPrivate()) return u.toString();
   const host = u.hostname.replace(/^\[|\]$/g, '');
   const addrs = net.isIP(host) ? [{ address: host }] : await lookup(host, { all: true });
   if (addrs.length === 0 || addrs.some((a) => isPrivateAddress(a.address))) {

@@ -5,5 +5,12 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build-static.mjs"
+  },
+  "dependencies": {
+    "@sparticuz/chromium": "141.0.0",
+    "playwright-core": "1.56.1"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }
