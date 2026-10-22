@@ -58,7 +58,8 @@ async function setImage(b, restored) {
   await new Promise((res, rej) => { im.onload = res; im.onerror = rej; im.src = url; });
   img = im; blob = b;
   cv.width = im.naturalWidth; cv.height = im.naturalHeight;
-  cv.hidden = false; $('empty').hidden = true; $('exportBtn').disabled = false; $('resize').disabled = false;
+  cv.hidden = false; $('empty').hidden = true; $('exportBtn').disabled = false; $('resize').disabled = false; document.querySelector('[data-mode=crop]').disabled = false;
+  if (mode === 'crop') setMode('select');
   if (!restored) { items = []; undoStack = []; selected = null; pending = null; }
   commit();
 }
@@ -128,6 +129,7 @@ cv.addEventListener('pointercancel', endDrag);
 function syncControls(it) { $('color').value = it.color; style.color = it.color; $('size').value = Math.round((it.size / defaultSize()) * 30); }
 function updateCropInfo() { $('cropInfo').textContent = `${Math.round(cropRect.w)} × ${Math.round(cropRect.h)} px`; }
 function setMode(m) {
+  if (m === 'crop' && !img) m = 'select';
   mode = m; pending = null; cropDrag = null;
   cropRect = m === 'crop' && img ? { x: 0, y: 0, w: cv.width, h: cv.height } : null;
   $('cropbar').hidden = m !== 'crop';
@@ -163,9 +165,10 @@ $('cropOk').onclick = async () => {
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
   c.getContext('2d').drawImage(img, x, y, w, h, 0, 0, w, h);
+  const nb = await canvasBlob(c);
+  if (!nb) { toast('이미지를 자를 수 없습니다'); return; }
   snapshot();
   shiftItems(items, -x, -y);
-  const nb = await canvasBlob(c);
   setMode('select');
   await replaceImage(nb);
 };
@@ -181,18 +184,21 @@ $('resize').onclick = () => {
   dlgResize.onclose = async () => {
     if (dlgResize.returnValue !== 'ok') return;
     const w = Math.round(Number($('rzW').value));
-    if (!(w >= 50 && w <= 8000) || w === img.naturalWidth) return;
     const h = Math.max(1, Math.round(w * rzRatio));
+    if (w === img.naturalWidth) return;
+    if (!(w >= 50 && h >= 50 && w <= 8000 && h <= 8000 && w * h <= 16e6)) { toast('크기 범위를 벗어났습니다 (가로·세로 50~8,000px, 총 1,600만 화소 이하)'); return; }
     const f = w / img.naturalWidth;
     const c = document.createElement('canvas');
     c.width = w; c.height = h;
     const cx = c.getContext('2d');
     cx.imageSmoothingQuality = 'high';
     cx.drawImage(img, 0, 0, w, h);
+    const nb = await canvasBlob(c);
+    if (!nb) { toast('이미지를 만들 수 없습니다. 더 작은 크기로 시도하세요'); return; }
     snapshot();
     scaleItems(items, f);
     selected = null;
-    await replaceImage(await canvasBlob(c));
+    await replaceImage(nb);
   };
   dlgResize.showModal();
 };
