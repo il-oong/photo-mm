@@ -30,6 +30,7 @@
   dialog { background:var(--panel); color:var(--fg); border:0; border-radius:14px; padding:18px; width:min(92vw,360px); }
   dialog::backdrop { background:rgba(0,0,0,.6); }
   dialog input, dialog textarea { width:100%; font:inherit; font-size:18px; padding:10px; border-radius:10px; border:1px solid #444; background:#000; color:var(--fg); margin:10px 0; }
+  .tools[hidden], [hidden] { display:none !important; }
   .row { display:flex; gap:8px; justify-content:flex-end; }
   #toast { position:fixed; left:50%; top:60px; transform:translateX(-50%); background:#000c; padding:8px 14px; border-radius:20px; display:none; z-index:9; }
 </style>
@@ -50,12 +51,20 @@
 <div class="tools">
   <button data-mode="select" class="on">선택</button>
   <button data-mode="dim">치수선</button>
+  <button data-mode="arrow">화살표</button>
   <button data-mode="note">메모</button>
+  <button data-mode="crop" disabled>자르기</button>
+  <button id="resize" disabled>크기</button>
   <button id="undo" disabled>실행취소</button>
   <button id="edit" disabled>수정</button>
   <button id="del" disabled>삭제</button>
   <input id="color" type="color" value="#ff3b30" aria-label="색상">
   <input id="size" type="range" min="10" max="80" value="30" aria-label="글자 크기">
+</div>
+<div id="cropbar" class="tools" hidden>
+  <span id="cropInfo" style="flex:1"></span>
+  <button id="cropCancel">취소</button>
+  <button id="cropOk" class="on">자르기 적용</button>
 </div>
 <div id="toast"></div>
 
@@ -68,6 +77,17 @@
   <div>메모</div>
   <textarea id="noteIn" rows="3"></textarea>
   <div class="row"><button value="cancel">취소</button><button value="ok" class="on">확인</button></div>
+</form></dialog>
+<dialog id="dlgResize"><form method="dialog">
+  <div id="resizeInfo"></div>
+  <div style="display:flex;gap:8px;margin:10px 0;align-items:center">
+    <input id="rzW" inputmode="numeric" style="margin:0" aria-label="가로 px"> ×
+    <input id="rzH" inputmode="numeric" style="margin:0" aria-label="세로 px">
+  </div>
+  <div class="row" style="justify-content:flex-start;flex-wrap:wrap;margin-bottom:10px">
+    <button type="button" data-pct="25">25%</button><button type="button" data-pct="50">50%</button><button type="button" data-pct="75">75%</button><button type="button" data-pct="100">원본</button>
+  </div>
+  <div class="row"><button value="cancel">취소</button><button value="ok" class="on">적용</button></div>
 </form></dialog>
 <dialog id="dlgUrl"><form method="dialog">
   <div>캡처할 사이트 주소</div>
