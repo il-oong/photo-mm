@@ -55,6 +55,24 @@ export function drawItems(ctx, items, selected) {
       ctx.textBaseline = 'middle';
       ctx.fillText(label, mx, my + it.size * 0.05);
       if (it === selected) handles(ctx, [it.a, it.b], it.size);
+    } else if (it.type === 'arrow') {
+      const lw = Math.max(3, it.size / 5);
+      const ang = Math.atan2(it.b.y - it.a.y, it.b.x - it.a.x);
+      const head = Math.min(it.size * 1.2, Math.hypot(it.b.x - it.a.x, it.b.y - it.a.y) * 0.6);
+      ctx.strokeStyle = ctx.fillStyle = it.color;
+      ctx.lineWidth = lw;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(it.a.x, it.a.y);
+      ctx.lineTo(it.b.x - Math.cos(ang) * head * 0.7, it.b.y - Math.sin(ang) * head * 0.7);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(it.b.x, it.b.y);
+      ctx.lineTo(it.b.x - Math.cos(ang - 0.45) * head, it.b.y - Math.sin(ang - 0.45) * head);
+      ctx.lineTo(it.b.x - Math.cos(ang + 0.45) * head, it.b.y - Math.sin(ang + 0.45) * head);
+      ctx.closePath();
+      ctx.fill();
+      if (it === selected) handles(ctx, [it.a, it.b], it.size);
     } else {
       const box = noteBox(ctx, it);
       pill(ctx, box.x, box.y, box.w, box.h, 'rgba(255,255,255,0.92)');
@@ -99,4 +117,24 @@ export async function exportPng(img, items) {
   ctx.drawImage(img, 0, 0);
   drawItems(ctx, items, null);
   return new Promise((r) => c.toBlob(r, 'image/png'));
+}
+
+/** 자르기 영역 표시: 바깥을 어둡게, 테두리와 모서리 손잡이 */
+export function drawCrop(ctx, r, W, H) {
+  const u = Math.max(W, H) / 60;
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(0, 0, W, r.y);
+  ctx.fillRect(0, r.y + r.h, W, H - r.y - r.h);
+  ctx.fillRect(0, r.y, r.x, r.h);
+  ctx.fillRect(r.x + r.w, r.y, W - r.x - r.w, r.h);
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = Math.max(2, u / 4);
+  ctx.strokeRect(r.x, r.y, r.w, r.h);
+  ctx.fillStyle = '#0a84ff';
+  for (const [x, y] of [[r.x, r.y], [r.x + r.w, r.y], [r.x, r.y + r.h], [r.x + r.w, r.y + r.h],
+    [r.x + r.w / 2, r.y], [r.x + r.w / 2, r.y + r.h], [r.x, r.y + r.h / 2], [r.x + r.w, r.y + r.h / 2]]) {
+    ctx.beginPath(); ctx.arc(x, y, u * 0.6, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  }
+  ctx.restore();
 }

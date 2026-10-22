@@ -1,5 +1,5 @@
-import { parseMm, hitTest } from './lib.js';
-import { drawItems, noteBox, exportPng } from './render.js';
+import { parseMm, hitTest, shiftItems, scaleItems, cropHit, dragCrop } from './lib.js';
+import { drawItems, drawCrop, noteBox, exportPng } from './render.js';
 import * as store from './store.js';
 
 const $ = (id) => document.getElementById(id);
@@ -7,6 +7,7 @@ const cv = $('cv'), ctx = cv.getContext('2d');
 let img = null, blob = null, items = [], mode = 'select', selected = null;
 let pending = null; // 치수선 첫 점
 let drag = null, undoStack = [];
+let cropRect = null, cropDrag = null;
 const style = { color: '#ff3b30', size: 0 };
 
 const toast = (m) => { const t = $('toast'); t.textContent = m; t.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(() => (t.style.display = 'none'), 2500); };
@@ -29,6 +30,7 @@ function redraw() {
   ctx.drawImage(img, 0, 0);
   // noteBox 계산용 컨텍스트가 같으므로 그대로 사용
   drawItems(ctx, items, selected);
+  if (cropRect) drawCrop(ctx, cropRect, cv.width, cv.height);
   if (pending) {
     ctx.fillStyle = style.color;
     ctx.beginPath();
@@ -36,10 +38,11 @@ function redraw() {
     ctx.fill();
   }
   $('undo').disabled = undoStack.length === 0;
-  $('edit').disabled = $('del').disabled = !selected;
+  $('edit').disabled = !selected || selected.type === 'arrow';
+  $('del').disabled = !selected;
 }
 
-function snapshot() { undoStack.push(JSON.stringify(items)); if (undoStack.length > 50) undoStack.shift(); }
+function snapshot() { undoStack.push({ items: JSON.stringify(items), blob }); if (undoStack.length > 50) undoStack.shift(); }
 function persist() { if (blob) store.save(blob, items, { color: style.color, slider: $('size').value }); }
 function commit() { redraw(); persist(); }
 
@@ -55,7 +58,7 @@ async function setImage(b, restored) {
   await new Promise((res, rej) => { im.onload = res; im.onerror = rej; im.src = url; });
   img = im; blob = b;
   cv.width = im.naturalWidth; cv.height = im.naturalHeight;
-  cv.hidden = false; $('empty').hidden = true; $('exportBtn').disabled = false;
+  cv.hidden = false; $('empty').hidden = true; $('exportBtn').disabled = false; $('resize').disabled = false;
   if (!restored) { items = []; undoStack = []; selected = null; pending = null; }
   commit();
 }
@@ -63,6 +66,19 @@ async function setImage(b, restored) {
 cv.addEventListener('pointerdown', async (e) => {
   if (!img) return;
   const p = pos(e);
+  if (mode === 'crop') {
+    const part = cropHit(cropRect, p, tol());
+    if (part) { cropDrag = { part, last: p }; cv.setPointerCapture(e.pointerId); }
+    return;
+  }
+  if (mode === 'arrow') {
+    if (!pending) { pending = p; redraw(); return; }
+    const a = pending; pending = null;
+    snapshot();
+    const it = { type: 'arrow', a, b: p, color: style.color, size: sizeFromSlider() };
+    items.push(it); selected = it; setMode('select'); commit();
+    return;
+  }
   if (mode === 'dim') {
     if (!pending) { pending = p; redraw(); return; }
     const a = pending; pending = null;
@@ -90,22 +106,32 @@ cv.addEventListener('pointerdown', async (e) => {
   }
 });
 cv.addEventListener('pointermove', (e) => {
+  if (cropDrag) {
+    const p = pos(e);
+    cropRect = dragCrop(cropRect, cropDrag.part, p.x - cropDrag.last.x, p.y - cropDrag.last.y, cv.width, cv.height, Math.max(40, cv.width / 15));
+    cropDrag.last = p; updateCropInfo(); redraw();
+    return;
+  }
   if (!drag || !selected) return;
   const p = pos(e), dx = p.x - drag.last.x, dy = p.y - drag.last.y;
   if (!drag.moved) { snapshot(); drag.moved = true; }
   const mv = (pt) => { pt.x += dx; pt.y += dy; };
-  if (selected.type === 'dim') {
+  if (selected.type === 'dim' || selected.type === 'arrow') {
     if (drag.part === 'a') mv(selected.a); else if (drag.part === 'b') mv(selected.b); else { mv(selected.a); mv(selected.b); }
   } else mv(selected.p);
   drag.last = p; redraw();
 });
-const endDrag = () => { if (drag?.moved) persist(); drag = null; };
+const endDrag = () => { if (drag?.moved) persist(); drag = null; cropDrag = null; };
 cv.addEventListener('pointerup', endDrag);
 cv.addEventListener('pointercancel', endDrag);
 
 function syncControls(it) { $('color').value = it.color; style.color = it.color; $('size').value = Math.round((it.size / defaultSize()) * 30); }
+function updateCropInfo() { $('cropInfo').textContent = `${Math.round(cropRect.w)} × ${Math.round(cropRect.h)} px`; }
 function setMode(m) {
-  mode = m; pending = null;
+  mode = m; pending = null; cropDrag = null;
+  cropRect = m === 'crop' && img ? { x: 0, y: 0, w: cv.width, h: cv.height } : null;
+  $('cropbar').hidden = m !== 'crop';
+  if (cropRect) updateCropInfo();
   document.querySelectorAll('[data-mode]').forEach((b) => b.classList.toggle('on', b.dataset.mode === m));
   if (m !== 'select') selected = null;
   redraw();
@@ -118,7 +144,63 @@ const snapOnce = () => { if (!styleSnapped) { snapshot(); styleSnapped = true; }
 $('color').oninput = (e) => { style.color = e.target.value; if (selected) { snapOnce(); selected.color = style.color; commit(); } };
 $('size').oninput = () => { if (selected) { snapOnce(); selected.size = sizeFromSlider(); redraw(); } };
 $('color').onchange = $('size').onchange = () => { styleSnapped = false; persist(); };
-$('undo').onclick = () => { if (!undoStack.length) return; items = JSON.parse(undoStack.pop()); selected = null; commit(); };
+$('undo').onclick = async () => {
+  if (!undoStack.length) return;
+  const s = undoStack.pop();
+  items = JSON.parse(s.items); selected = null;
+  if (s.blob !== blob) await setImage(s.blob, true); else commit();
+};
+
+// 이미지 자체를 바꾸는 작업(자르기·크기): 이전 이미지와 항목을 실행취소에 남긴다
+async function replaceImage(nb) {
+  await setImage(nb, true);
+}
+function canvasBlob(c) { return new Promise((r) => c.toBlob(r, 'image/png')); }
+$('cropCancel').onclick = () => setMode('select');
+$('cropOk').onclick = async () => {
+  const r = cropRect;
+  const x = Math.round(r.x), y = Math.round(r.y), w = Math.round(r.w), h = Math.round(r.h);
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  c.getContext('2d').drawImage(img, x, y, w, h, 0, 0, w, h);
+  snapshot();
+  shiftItems(items, -x, -y);
+  const nb = await canvasBlob(c);
+  setMode('select');
+  await replaceImage(nb);
+};
+
+const dlgResize = $('dlgResize');
+let rzRatio = 1;
+$('resize').onclick = () => {
+  if (!img) return;
+  rzRatio = img.naturalHeight / img.naturalWidth;
+  $('resizeInfo').textContent = `현재 ${img.naturalWidth} × ${img.naturalHeight} px (비율 유지)`;
+  $('rzW').value = img.naturalWidth; $('rzH').value = img.naturalHeight;
+  dlgResize.returnValue = '';
+  dlgResize.onclose = async () => {
+    if (dlgResize.returnValue !== 'ok') return;
+    const w = Math.round(Number($('rzW').value));
+    if (!(w >= 50 && w <= 8000) || w === img.naturalWidth) return;
+    const h = Math.max(1, Math.round(w * rzRatio));
+    const f = w / img.naturalWidth;
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const cx = c.getContext('2d');
+    cx.imageSmoothingQuality = 'high';
+    cx.drawImage(img, 0, 0, w, h);
+    snapshot();
+    scaleItems(items, f);
+    selected = null;
+    await replaceImage(await canvasBlob(c));
+  };
+  dlgResize.showModal();
+};
+$('rzW').oninput = () => { $('rzH').value = Math.round(Number($('rzW').value) * rzRatio) || ''; };
+$('rzH').oninput = () => { $('rzW').value = Math.round(Number($('rzH').value) / rzRatio) || ''; };
+dlgResize.querySelectorAll('[data-pct]').forEach((b) => (b.onclick = () => {
+  $('rzW').value = Math.round(img.naturalWidth * Number(b.dataset.pct) / 100); $('rzW').oninput();
+}));
 $('del').onclick = () => { if (!selected) return; snapshot(); items = items.filter((i) => i !== selected); selected = null; commit(); };
 $('edit').onclick = async () => {
   if (!selected) return;
